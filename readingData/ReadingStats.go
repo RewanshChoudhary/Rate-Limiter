@@ -2,13 +2,16 @@ package readingdata
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 
-	"honnef.co/go/tools/config"
+	"github.com/RewanshChoudhary/System-Monitor/configuration"
 )
 
 var STAT_KEYS = []string{"MemTotal", "MemFree", "MemAvailable", "SwapTotal", "SwapCache", "SwapFree"}
@@ -44,32 +47,48 @@ func ReadMemoryStatus() (map[string]int64, error) {
 	stats := make(map[string]int64)
 
 	for scanner.Scan() {
-        
+
 		key, value, err := parseMemInfoLine(scanner.Text())
-		if slices.Contains(STAT_KEYS,key){
+		if slices.Contains(STAT_KEYS, key) {
 			stats[key] = value
 
-
-			
 		}
-		
+
 		fmt.Println("Read the stats")
 		if err != nil {
 
 		}
 
-		
-
-		
-
 	}
 	return stats, nil
 }
 
+func SendStatsToProducer(stats map[string]int64) (map[string]int64, error) {
+	producerUrl := configuration.AppConfig.Prod
 
- func sendStatsToProducer(stats map[string ]int64) (map[string]int64,error){
- 	producerUrl:=config.Config.Prod
-	
-	
+	requestBodyBytes, err := json.Marshal(stats)
+	if err != nil {
+		panic(fmt.Errorf("Json was not read %w", err))
 
- }
+	}
+	requestBody := bytes.NewReader(requestBodyBytes)
+
+	request, err := http.NewRequest("POST", producerUrl, requestBody)
+	if err != nil {
+		panic(fmt.Errorf("error in request creation %w", err))
+	}
+	request.Header.Add("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(request)
+
+	if err != nil {
+		panic(fmt.Errorf("While sending the request %w", err))
+
+	}
+	if resp.StatusCode != 200 {
+		panic(fmt.Errorf("The request was not sent properly"))
+
+	}
+
+	return nil, nil
+}
